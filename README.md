@@ -1,23 +1,38 @@
 # Bayesian Regression for Weather Forecasting
 
-This project explores the use of **Bayesian inference techniques** for regression-based weather forecasting, using time series data provided by **ARPAV** (Agenzia Regionale per la Prevenzione e Protezione Ambientale del Veneto).  
-The work focused on building probabilistic models that not only predict weather variables but also quantify the **uncertainty** associated with those predictions, offering an advantage over classical regression approaches.
+This project looks at how **Bayesian regression** can be used to improve weather forecasting using data from **ARPAV** (Agenzia Regionale per la Prevenzione e Protezione Ambientale del Veneto).  
+Instead of just predicting future values, the idea was to also measure how **certain or uncertain** those predictions are — which is really important when dealing with something as complex as the weather.
 
 ---
 
-## Project Overview
-- **Objective:** Apply Bayesian regression to ARPAV time series data for weather forecasting.  
-- **Methods:**
-  - Regression models in a **Bayesian inference** framework.
-  - Posterior distribution analysis of model parameters.
-  - Uncertainty quantification for predictions.
-- **Tools & Libraries:** Python, PyMC / Stan, NumPy, Pandas, Matplotlib.  
+## What We Did
+- Collected and cleaned **time series data** from ARPAV.  
+- Built regression models in a **Bayesian framework**.  
+- Explored the **posterior distributions** of the parameters.  
+- Compared the Bayesian approach with more traditional regression methods.  
 
 ---
 
-## Key Results
-- Developed Bayesian regression models adapted to ARPAV meteorological data.
-- Highlighted how probabilistic models provide a richer interpretation of forecast uncertainty.
-- Comparison with traditional approaches showed increased robustness to noisy or incomplete datasets.
+## Why It’s Interesting
+- Bayesian methods don’t just give a number, they also give a **confidence interval** around the prediction.  
+- This makes the model more transparent and useful, since we can see how reliable a forecast is.  
+- The approach proved to be more robust when data was noisy or incomplete.  
+
+---
+
+## Tools We Used
+- **Python** for data analysis and modeling  
+- **PyMC / Stan** for Bayesian inference  
+- **Pandas, NumPy, Matplotlib** for data handling and visualization  
+
+---
+
+## Credits
+This project was developed in collaboration with:  
+- **Alessandro Miotto**  
+- **Lorenzo Rizzi**  
+- **Riccardo Corte**  
+
+
 
 
