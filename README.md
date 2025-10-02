@@ -5,7 +5,7 @@ The work focused on building probabilistic models that not only predict weather 
 
 ---
 
-## 📌 Project Overview
+## Project Overview
 - **Objective:** Apply Bayesian regression to ARPAV time series data for weather forecasting.  
 - **Methods:**
   - Regression models in a **Bayesian inference** framework.
@@ -15,12 +15,9 @@ The work focused on building probabilistic models that not only predict weather 
 
 ---
 
-## 🔬 Key Results
+## Key Results
 - Developed Bayesian regression models adapted to ARPAV meteorological data.
 - Highlighted how probabilistic models provide a richer interpretation of forecast uncertainty.
 - Comparison with traditional approaches showed increased robustness to noisy or incomplete datasets.
 
----
-
-## 📂 Repository Structure
 
