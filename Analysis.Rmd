@@ -1,0 +1,782 @@
+## Part 2 - Lorenzo Rizzi
+
+We will now examine how the annual differences in minimum, maximum, and daily average temperatures have evolved over time
+
+To begin, let’s gather the necessary data into a set of R data frames
+
+```{r}
+library(dplyr)
+library(lubridate)
+
+# first of all, load the data
+# ArpaP and ArpaV have different formatting rule in their csvs, so we have to use different ways to gather the needed data to produce a coherent dataset
+
+# VENETO
+df.auronzo <- read.csv("./data/AuronzoDiCadore.csv", header = T)
+df.castelfranco <- read.csv("./data/CastelfrancoVeneto.csv", header = T)
+df.portotolle <- read.csv("./data/PortoTolle.csv", header = T)
+df.roverchiara <- read.csv("./data/Roverchiara.csv", header = T)
+
+# PIEMONTE - Cumiana, Acqui Terme, Colle Barant, Garessio
+df.cumiana <- read.csv("./data/Piemonte/CUMIANA_t.csv", header = T)
+df.cumiana |> select(DATA........, Temperatura.media...C., Temperatura.massima...C., Temperatura.minima...C.) |> transmute(Year = year(as.Date(DATA........)), min = Temperatura.minima...C., max = Temperatura.massima...C., avg = Temperatura.media...C.) |> group_by(Year) |> summarise( Min = mean(min, na.rm = T), Max = mean(max, na.rm = T), Avg = mean(avg, na.rm = T)) -> df.cumiana
+
+df.acqui <- read.csv("./data/Piemonte/ACQUI TERME_t.csv", header = T)
+df.acqui |> select(DATA........, Temperatura.media...C., Temperatura.massima...C., Temperatura.minima...C.) |> transmute(Year = year(as.Date(DATA........)), min = Temperatura.minima...C., max = Temperatura.massima...C., avg = Temperatura.media...C.) |> group_by(Year) |> summarise( Min = mean(min, na.rm = T), Max = mean(max, na.rm = T), Avg = mean(avg, na.rm = T)) -> df.acqui
+
+df.barant <- read.csv("./data/Piemonte/COLLE BARANT_t.csv", header = T)
+df.barant |> select(DATA........, Temperatura.media...C., Temperatura.massima...C., Temperatura.minima...C.) |> transmute(Year = year(as.Date(DATA........)), min = Temperatura.minima...C., max = Temperatura.massima...C., avg = Temperatura.media...C.) |> group_by(Year) |> summarise( Min = mean(min, na.rm = T), Max = mean(max, na.rm = T), Avg = mean(avg, na.rm = T)) -> df.barant
+
+df.garessio <- read.csv("./data/Piemonte/GARESSIO_t.csv", header = T)
+df.garessio |> select(DATA........, Temperatura.media...C., Temperatura.massima...C., Temperatura.minima...C.) |> transmute(Year = year(as.Date(DATA........)), min = Temperatura.minima...C., max = Temperatura.massima...C., avg = Temperatura.media...C.) |> group_by(Year) |> summarise( Min = mean(min, na.rm = T), Max = mean(max, na.rm = T), Avg = mean(avg, na.rm = T)) -> df.garessio
+
+
+# a list of dataframes, one for each station
+veneto.dfs <- list("Auronzo" = df.auronzo, "Castelfranco" = df.castelfranco, "Portotolle" = df.portotolle, "Roverchiara" =  df.roverchiara)
+piemonte.dfs <- list("Cumiana" = df.cumiana, "Acqui" = df.acqui, "Barant" = df.barant, "Garessio" = df.garessio)
+
+piemonte.names <- c("Cumiana", "Acqui", "Barant", "Garessio")
+veneto.names <- c("Auronzo","Castelfranco","Portotolle","Roverchiara")
+
+n.stations = length(veneto.dfs)
+# Let's print one of those dataframes
+head(veneto.dfs$Auronzo,10)
+```
+
+Next, we want to calculate the annual differences in minimum, maximum, and daily average temperatures
+
+```{r}
+
+createDataframeDeltas <- function(df){
+  returnList = list()
+  for (i in 1:n.stations){
+    # We will use the dplyr tools to groupby and average over groups
+    df[[i]] |> group_by(Year) |> summarise(deltaMin = mean(Min), deltaMax = mean(Max), deltaAvg = mean(Avg)) -> temp.df
+    # creating the differences, year by year, and assing it to a newly created list
+    temp.df[-1, -1] - temp.df[-length(temp.df$Year), -1] -> returnList[[i]]
+  }
+  return(returnList)
+}
+
+# two lists to accomodate the two regions
+veneto.deltas = createDataframeDeltas(veneto.dfs)
+piemonte.deltas = createDataframeDeltas(piemonte.dfs)
+# let us give the proper way to the stations
+names(piemonte.deltas) <- piemonte.names
+names(veneto.deltas) <- veneto.names
+```
+
+Let’s visualize the annual temperature increments for a selected weather station:
+
+```{r}
+library(ggplot2)
+library(grid)
+library(gridExtra)
+
+# select the station to visualize
+region <- 2      # (1 - Veneto,    2 - Piemonte)
+station <- 1
+
+chosen.list <- switch(region, "1" = veneto.deltas, "2" = piemonte.deltas)
+name <- names(chosen.list)[station]
+
+x <- 1:length(rownames(chosen.list[[station]]))
+a <- ggplot(chosen.list[[station]], aes(x = x, y = deltaMin)) +
+  geom_line(color = "skyblue", lwd =1) +
+  geom_abline(intercept = 0, slope = 0, linetype = "dashed", color = "skyblue") +
+  geom_point(color = "blue", size = 2) +
+  labs(title = "Increment min temp", x = "", y = expression(Delta * "T (°C)")) +
+  theme_minimal(base_size = 10) +
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
+        axis.title = element_text(size = 9),
+        axis.text = element_text(size = 8))
+
+b <- ggplot(chosen.list[[station]], aes(x = x, y = deltaMax)) +
+  geom_line(color = "salmon", lwd =1) +
+  geom_abline(intercept = 0, slope = 0, linetype = "dashed", color = "salmon") +
+  geom_point(color = "red", size = 2) +
+  labs(title = "Increment max temp", x = "", y  = expression(Delta * "T (°C)")) +
+  theme_minimal(base_size = 10) +
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
+        axis.title = element_text(size = 9),
+        axis.text = element_text(size = 8))
+
+c <- ggplot(chosen.list[[station]], aes(x = x, y = deltaAvg)) +
+  geom_line(color = "green", lwd = 1) +
+  geom_abline(intercept = 0, slope = 0, linetype = "dashed", color = "green") +
+  geom_point(color = "darkgreen", size = 2) +
+  labs(title = "Increment avg temp", x = "1 year time interval", y = expression(Delta * "T (°C)")) +
+  theme_minimal(base_size = 10) +
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
+        axis.title = element_text(size = 8),
+        axis.text = element_text(size = 8))
+
+text <- textGrob(name, gp = gpar(fontsize = 11, fontface = "italic"))
+grid.arrange(text, arrangeGrob(a, b, c, nrow = 3), nrow = 2, heights = c(0.05, 1))
+```
+
+Do our data suggest a consistent year-over-year increase in temperatures? As a first, naive approach, we can compute the average $\Delta T$ to evaluate whether this observation holds any merit
+
+```{r}
+for (i in 1:n.stations){
+  df <- veneto.deltas[[i]]
+  cat(switch(i, "## Auronzo:\n", "## Castelfranco V.:\n", "## Porto Tolle:\n", "## Roverchiara:\n", "## Cumiana:\n"))
+  cat("Average increase in T max (1994-2023): ", format(mean(df$deltaMax),digit=3) ,"\n")
+  cat("Average increase in T min (1994-2023): ", format(mean(df$deltaMin),digit=3) ,"\n")
+  cat("Average increase in T avg (1994-2023): ", format(mean(df$deltaAvg),digit=3) ,"\n")
+}
+```
+
+Since the computed averages are all positive throughout the time series, this suggests a *potential* upward trend in temperatures. To investigate this more rigorously, we now turn to a Bayesian framework.
+
+## 4-years interval Bayesian inference
+
+As a first step, we aggregate the time series into 4-year intervals.
+
+```{r}
+
+# a function that aggregates by 4 years
+aggregateBy4Year <- function(l, get.rid){
+  returnList <- list()
+  for(i in 1:(n.stations)){
+    # retrieve the usual data, grouped by year
+    l[[i]] |> group_by(Year) |> summarise(avgMin = mean(Min), avgMax = mean(Max), avgDaily = mean(Avg)) -> temp.df
+    
+     # Now we need to aggregate by 4 years. we will perform a trick: add a column whose  value is updated every 4 yrs and aggregate over that helper variable (a quadriennium,     basically)
+    helper.columns <- rep(1:(length(temp.df$Year)/4), each = 4)
+    # get rid of the last two year (not a multiple of 4)
+    to.remove <- (length(temp.df$Year)):(length(temp.df$Year)-get.rid[i])
+    temp.df[-to.remove, ] -> temp.df
+    # now group by quadriennium: add a column and groupby
+    temp.df |> mutate(quadriennium = helper.columns) |> group_by(quadriennium) |> summarise(delta.4yrs.min = mean(avgMin), delta.4yrs.max = mean(avgMax), delta.4yrs.avg = mean(avgDaily)) -> temp.df
+    # now compute the 4yrs incremental differences, as before
+    temp.df[-1, -1] - temp.df[-length(temp.df$delta.4yrs.max), -1] -> returnList[[i]]
+  }
+  names(returnList) <- names(l)
+  return(returnList)
+}
+
+# it's not mandatory that time series have a number of points which is a multiple of 4
+# this vectors tells the function above how many point it should discard when grouping, so that we get a multiple of 4
+get.rid <- rep(c(1,0), each = 4)
+
+veneto.4y <- aggregateBy4Year(veneto.dfs, c(1,1,1,1))
+piemonte.4y <- aggregateBy4Year(piemonte.dfs, c(0,0,0,0))
+```
+
+Just as before, we visualize the aggregated data:
+
+```{r}
+# Let's plot those reduced time series, as we did above
+region <- 1
+station <- 2
+
+chosen.list <- switch(region, "1" = veneto.4y, "2" = piemonte.4y)
+name <- names(chosen.list)[station]
+
+x <- 1:length(rownames(chosen.list[[station]]))
+a <- ggplot(chosen.list[[station]], aes(x = x, y = delta.4yrs.min)) +
+  geom_line(color = "skyblue", lwd =1) +
+  geom_abline(intercept = 0, slope = 0, linetype = "dashed", color = "skyblue") +
+  geom_point(color = "blue", size = 2) +
+  labs(title = "Increment min temp over 4 yrs", x = "",y = expression(Delta * "T (°C)")) +
+  theme_minimal(base_size = 10) +
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
+        axis.title = element_text(size = 9),
+        axis.text = element_text(size = 8))
+
+b <- ggplot(chosen.list[[station]], aes(x = x, y = delta.4yrs.max)) +
+  geom_line(color = "salmon", lwd =1) +
+  geom_abline(intercept = 0, slope = 0, linetype = "dashed", color = "salmon") +
+  geom_point(color = "red", size = 2) +
+  labs(title = "Increment max temp over 4 yrs", x = "",y = expression(Delta * "T (°C)")) +
+  theme_minimal(base_size = 10) +
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
+        axis.title = element_text(size = 9),
+        axis.text = element_text(size = 8))
+
+c <- ggplot(chosen.list[[station]], aes(x = x, y = delta.4yrs.avg)) +
+  geom_line(color = "green", lwd =1) +
+  geom_abline(intercept = 0, slope = 0, linetype = "dashed", color = "green") +
+  geom_point(color = "darkgreen", size = 2) +
+  labs(title = "Increment avg temp over 4 yrs", x = "4 year time interval (1994-2022)",y = expression(Delta * "T (°C)")) +
+  theme_minimal(base_size = 10) +
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
+        axis.title = element_text(size = 9),
+        axis.text = element_text(size = 8))
+
+text <- textGrob(name, gp = gpar(fontsize = 11, fontface = "italic"))
+grid.arrange(text, arrangeGrob(a, b, c, nrow = 3), nrow = 2, heights = c(0.05, 1))
+
+```
+
+The increasing trend in the temporal evolution of temperature is now even more evident.
+
+Now that we've grouped the data into 4-year intervals, we can recompute the temperature trend. As a first naive approach, we can simply take the average to assess whether an increasing pattern persists.
+
+```{r}
+for (i in 1:(n.stations)){
+  df <- veneto.4y[[i]]
+  cat(paste("## ", names(veneto.4y)[i]), "\n")
+  cat("4 yrs increase in T max (1994-2023): ", format(mean(df$delta.4yrs.max),digit=3), "°C / 4yrs" ,"\n")
+  cat("4 yrs increase in T min (1994-2023): ", format(mean(df$delta.4yrs.min),digit=3),"°C / 4yrs" ,"\n")
+  cat("4 yrs increase in T avg (1994-2023): ", format(mean(df$delta.4yrs.avg),digit=3) ,"°C / 4yrs" ,"\n")
+}
+
+for (i in 1:(n.stations)){
+  df <- piemonte.4y[[i]]
+  cat(paste("## ", names(piemonte.4y)[i]), "\n")
+  cat("4 yrs increase in T max (1994-2023): ", format(mean(df$delta.4yrs.max),digit=3), "°C / 4yrs" ,"\n")
+  cat("4 yrs increase in T min (1994-2023): ", format(mean(df$delta.4yrs.min),digit=3),"°C / 4yrs" ,"\n")
+  cat("4 yrs increase in T avg (1994-2023): ", format(mean(df$delta.4yrs.avg),digit=3) ,"°C / 4yrs" ,"\n")
+}
+```
+
+Now, let’s take a Bayesian approach. Following the method suggested in the paper, we perform a linear regression on the temperature differences. Let $\Delta T_j = T_{j+1} - T_j$ be the temperature change between two consecutive quadrienna as measured by a weather station. We assume that this quantity is a random variable distributed as:
+
+$$
+\Delta T_j \sim Norm(aj + b, \sigma)
+$$
+
+In this model, if the temperature increases at a constant rate, then $a = 0$, and the trend is purely linear. However, if $a \ne 0$, this implies that the rate of temperature change itself is increasing or decreasing, i.e. there’s an **acceleration** (or deceleration) in temperature growth.
+
+We now proceed to define the prior distributions for the parameters $a, b, \sigma$. We'll chose:
+
+-   $a \sim N(0,1)$
+
+-   $b \sim N(0,1) \mbox{   or    } Unif(-1,1)$
+
+-   $\sigma$ should be invariant under reparameterization, so we choose a Jeoffrey prior: $P(\sigma) \sim 1/\sigma$
+
+Let's build our statistical model using STAN. We assume our model to be valid for each weather station (with eventually different values of $a,b,\sigma$). However, we will focus mainly on $b$, since we have strong evidence that the increase in temperature is linear.
+
+```{r}
+library(rstan)
+library(coda)
+
+# optimization commands
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+
+# the model itself
+model.String.noSlope <- "
+data {
+  int<lower=1> N;       // n. of points
+  real ixs[N];          // indices
+  real y[N];            // observed data (delta T)
+}
+
+parameters {
+  real b;                    
+  real<lower=0> sigma;       
+}
+
+model {
+  b ~ normal(0, 1);         // b prior
+  target += -log(sigma);     // sigma jeoffrey prior. Log(sigma) will be sampled uniformly
+
+  for (i in 1:N){
+    y[i] ~ normal(b, sigma);   // generative constant model
+  }
+}
+"
+  
+model.String.Slope <- "
+data {
+  int<lower=1> N;       // n. of points
+  real ixs[N];          // indices
+  real y[N];            // observed data (delta T)
+}
+
+parameters {
+  real a;                   
+  real b;                    
+  real<lower=0> sigma;       
+}
+
+model {
+  a ~ normal(0, 1);         // a prior
+  b ~ uniform(-1, 1);         // b prior
+  target += -log(sigma);     // sigma jeoffrey prior
+
+  for (i in 1:N){
+    y[i] ~ normal(b + a*ixs[i], sigma);   // generative model
+  }
+}
+"
+  
+# compiling the two linear Bayesian regressors
+stanDSONoSlope <- stan_model(model_code=model.String.noSlope)
+stanDSOSlope <- stan_model(model_code=model.String.Slope)
+```
+
+```{r}
+# function that runs the bayesian MCMC linear regression on a weather station
+runLinearRegression <- function(modelDSO, region, station, temp){
+  # temp: (1, min), (2, max), (3, avg)
+  chosen.list <- switch(region, "1" = veneto.4y, "2" = piemonte.4y)
+  df <- chosen.list[[station]]
+  ixs <- 1:length(rownames(chosen.list[[station]]))
+  data <- list(N = length(df[[temp]]), ixs = ixs, y = df[[temp]])
+  stanFit <- sampling(object = modelDSO, data = data, iter = 1e5, warmup = 1000, thin = 5, refresh = 0, verbose = FALSE)
+  return(stanFit)
+}
+```
+
+We are now ready to run the linear Bayesian regressors
+
+```{r}
+
+# VENETO
+linearRegressorsAuronzo <- list("min" = runLinearRegression(stanDSONoSlope,1,1,1), "max" = runLinearRegression(stanDSONoSlope,1,1,2), "avg" = runLinearRegression(stanDSONoSlope,1,1,3))
+
+linearRegressorsCastelfranco <- list("min" = runLinearRegression(stanDSONoSlope,1,2,1), "max" = runLinearRegression(stanDSONoSlope,1,2,2), "avg" = runLinearRegression(stanDSONoSlope,1,2,3))
+
+linearRegressorsPortoTolle <- list("min" = runLinearRegression(stanDSONoSlope,1,3,1), "max" = runLinearRegression(stanDSONoSlope,1,3,2), "avg" = runLinearRegression(stanDSONoSlope,1,3,3))
+
+linearRegressorsRoverchiara <- list("min" = runLinearRegression(stanDSONoSlope,1,4,1), "max" = runLinearRegression(stanDSONoSlope,1,4,2), "avg" = runLinearRegression(stanDSONoSlope,1,4,3))
+
+# PIEMONTE 
+linearRegressorsCumiana <- list("min" = runLinearRegression(stanDSONoSlope,2,1,1), "max" = runLinearRegression(stanDSONoSlope,2,1,2), "avg" = runLinearRegression(stanDSONoSlope,2,1,3))
+
+linearRegressorsAcqui <- list("min" = runLinearRegression(stanDSONoSlope,2,2,1), "max" = runLinearRegression(stanDSONoSlope,2,2,2), "avg" = runLinearRegression(stanDSONoSlope,2,2,3))
+
+linearRegressorsBarant <- list("min" = runLinearRegression(stanDSONoSlope,2,3,1), "max" = runLinearRegression(stanDSONoSlope,2,3,2), "avg" = runLinearRegression(stanDSONoSlope,2,3,3))
+
+linearRegressorsGaressio <- list("min" = runLinearRegression(stanDSONoSlope,2,4,1), "max" = runLinearRegression(stanDSONoSlope,2,4,2), "avg" = runLinearRegression(stanDSONoSlope,2,4,3))
+
+# extract the chain
+posteriorAuronzo <- lapply(linearRegressorsAuronzo, as.data.frame)
+posteriorCastelfranco <- lapply(linearRegressorsCastelfranco, as.data.frame)
+posteriorPortoTolle <- lapply(linearRegressorsPortoTolle, as.data.frame)
+posteriorRoverchiara <- lapply(linearRegressorsRoverchiara, as.data.frame)
+
+posteriorCumiana <- lapply(linearRegressorsCumiana, as.data.frame)
+posteriorAcqui <- lapply(linearRegressorsAcqui, as.data.frame)
+posteriorBarant <- lapply(linearRegressorsBarant, as.data.frame)
+posteriorGaressio <- lapply(linearRegressorsGaressio, as.data.frame)
+```
+
+```{r}
+# To inspect if everything went well, we can evaluate the Rhat factor and the effective size
+print(summary(linearRegressorsAuronzo$min)$summary)
+
+mcmc_chain <- as.mcmc(posteriorAuronzo$min)
+# compute the autocorrelation factor
+acf_vals <- acf(mcmc_chain, lag.max = 300, plot = FALSE)
+
+lags <- acf_vals$lag   #one for each parameter
+acf_values <- acf_vals$acf  #one for each parameter
+
+plot(lags[,1,1], acf_values[,1,1], type = "b", lwd = 3, col = "blue", xlab = "Lag", ylab = "ACF", main = "Autocorrelation diagram", xlim = c(0,10), ylim = c(0, 1))
+```
+
+Let us now plot the posterior distribution for the parameter $b$, which is the 4-yrs increment in the temperature.
+
+```{r}
+# select the region
+region <- 1
+
+# pack the posteriors ...
+chosen.posterior <- switch(region, "1" = list(posteriorAuronzo, posteriorCastelfranco, posteriorPortoTolle, posteriorRoverchiara), "2" = list(posteriorCumiana, posteriorAcqui, posteriorBarant, posteriorGaressio))
+# ... and the name
+chosen.names <- switch(as.character(region), "1"= veneto.names, "2"=piemonte.names )
+
+p1 <- ggplot() +
+  geom_density(data = chosen.posterior[[1]]$min, aes(x = b), color = "#1b9e77") +
+  stat_function(fun = dnorm, args = list(mean = mean(chosen.posterior[[1]]$min$b), sd = sd(chosen.posterior[[1]]$min$b)),color = "#1b9e77", linetype = "dashed") +
+  geom_density(data = chosen.posterior[[2]]$min, aes(x = b), color = "#d95f02") +
+  stat_function(fun = dnorm, args = list(mean = mean(chosen.posterior[[2]]$min$b),sd = sd(chosen.posterior[[2]]$min$b)),color = "#d95f02", linetype = "dashed") +
+  geom_density(data = chosen.posterior[[3]]$min, aes(x = b), color = "#7570b3") +
+    stat_function(fun = dnorm, args = list(mean = mean(chosen.posterior[[3]]$min$b),sd = sd(chosen.posterior[[3]]$min$b)),color = "#7570b3", linetype = "dashed") +
+  geom_density(data = chosen.posterior[[4]]$min, aes(x = b), color = "#e7298a") +
+    stat_function(fun = dnorm, args = list(mean = mean(chosen.posterior[[4]]$min$b),sd = sd(chosen.posterior[[4]]$min$b)),color = "#e7298a", linetype = "dashed") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  labs(title = "Posterior density of b (min temp)", y = "Density") +
+  coord_cartesian(xlim = c(-0.8, 0.8))  +
+  theme(plot.title = element_text(hjust = 0.5, size = 10),
+        axis.title = element_text(size = 7),
+        axis.text = element_text(size = 6))
+
+p2 <- ggplot() +
+  geom_density(data = chosen.posterior[[1]]$max, aes(x = b), color = "#1b9e77") +
+  stat_function(fun = dnorm, args = list(mean = mean(chosen.posterior[[1]]$max$b),sd = sd(chosen.posterior[[1]]$max$b)),color = "#1b9e77", linetype = "dashed") +
+  geom_density(data = chosen.posterior[[2]]$max, aes(x = b), color = "#d95f02") +
+      stat_function(fun = dnorm, args = list(mean = mean(chosen.posterior[[2]]$max$b),sd = sd(chosen.posterior[[2]]$max$b)),color = "#d95f02", linetype = "dashed") +
+  geom_density(data = chosen.posterior[[3]]$max, aes(x = b), color = "#7570b3") +
+      stat_function(fun = dnorm, args = list(mean = mean(chosen.posterior[[3]]$max$b),sd = sd(chosen.posterior[[3]]$max$b)),color = "#7570b3", linetype = "dashed") +
+  geom_density(data = chosen.posterior[[4]]$max, aes(x = b), color = "#e7298a") +
+      stat_function(fun = dnorm, args = list(mean = mean(chosen.posterior[[4]]$max$b),sd = sd(chosen.posterior[[4]]$max$b)),color = "#e7298a", linetype = "dashed") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  labs(title = "Posterior density of b (max temp)", y = "Density") +
+  coord_cartesian(xlim = c(-0.8, 0.8))  +
+  theme(plot.title = element_text(hjust = 0.5, size = 10),
+        axis.title = element_text(size = 7),
+        axis.text = element_text(size = 6))
+
+p3 <- ggplot() +
+  geom_density(data = chosen.posterior[[1]]$avg, aes(x = b), color = "#1b9e77") +
+    stat_function(fun = dnorm, args = list(mean = mean(chosen.posterior[[1]]$avg$b),sd = sd(chosen.posterior[[1]]$avg$b)),color = "#1b9e77", linetype = "dashed") +
+  geom_density(data = chosen.posterior[[2]]$avg, aes(x = b), color = "#d95f02") +
+    stat_function(fun = dnorm, args = list(mean = mean(chosen.posterior[[2]]$avg$b),sd = sd(chosen.posterior[[2]]$avg$b)),color = "#d95f02", linetype = "dashed") +
+  geom_density(data = chosen.posterior[[3]]$avg, aes(x = b), color = "#7570b3") +
+        stat_function(fun = dnorm, args = list(mean = mean(chosen.posterior[[3]]$avg$b),sd = sd(chosen.posterior[[3]]$avg$b)),color = "#7570b3", linetype = "dashed") +
+  geom_density(data = chosen.posterior[[4]]$avg, aes(x = b), color = "#e7298a") +
+        stat_function(fun = dnorm, args = list(mean = mean(chosen.posterior[[4]]$avg$b),sd = sd(chosen.posterior[[4]]$avg$b)),color = "#e7298a", linetype = "dashed") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  labs(title = "Posterior density of b (avg temp)", x = "b", y = "Density") +
+  coord_cartesian(xlim = c(-.5, .5))  +
+  theme(plot.title = element_text(hjust = 0.5, size = 10),
+        axis.title = element_text(size = 7),
+        axis.text = element_text(size = 6))
+
+text <- grobTree(
+  textGrob(paste(" - ", chosen.names[1]), x = unit(0.06, "npc"), just = "left", 
+           gp = gpar(col = "#1b9e77", fontsize = 9, fontface = "italic")),
+  textGrob(paste(" - ", chosen.names[2]), x = unit(0.31, "npc"), just = "left", 
+           gp = gpar(col = "#d95f02", fontsize = 9, fontface = "italic")),
+  textGrob(paste(" - ", chosen.names[3]), x = unit(0.56, "npc"), just = "left", 
+           gp = gpar(col = "#7570b3", fontsize = 9, fontface = "italic")),
+  textGrob(paste(" - ", chosen.names[4]), x = unit(0.81, "npc"), just = "left", 
+           gp = gpar(col = "#e7298a", fontsize = 9, fontface = "italic"))
+)
+
+grid.arrange(text, arrangeGrob(p1, p2, p3, nrow = 3), nrow = 2, heights = c(0.05, 1))
+```
+
+------------------------------------------------------------------------
+
+## Analysis of parameter $b$
+
+Let's summarize what we found with our Bayesian analysis about the parameter $b$, which represents the average increase in temperature every $4$ years. Using the average value of the posterior as an estimator for $b$ and its sample variance as an estimator for the error, we can finally write:
+
+```{r}
+l.veneto <- list(linearRegressorsAuronzo, linearRegressorsCastelfranco, linearRegressorsPortoTolle, linearRegressorsRoverchiara)
+l.piemonte <- list(linearRegressorsCumiana, linearRegressorsAcqui, linearRegressorsBarant, linearRegressorsGaressio)
+
+digits <- 2
+# Following the scientific convention, we will truncate the error up to the first significative digit 
+for (i in 1:length(veneto.names)) {
+  cat("######### ", veneto.names[i], ", FIT RESULT #########\n") 
+  
+  cat("4 yrs increase trend in min temp.: (", 
+      format(summary(l.veneto[[i]]$min)$summary["b", "mean"], digits = digits), 
+      " ± ", 
+      format(summary(l.veneto[[i]]$min)$summary["b", "sd"], digits = digits), ") °C / 4 yrs \n",
+      sep = "")
+  
+  cat("4 yrs increase trend in max temp.: (", 
+      format(summary(l.veneto[[i]]$max)$summary["b", "mean"], digits = digits), 
+      " ± ", 
+      format(summary(l.veneto[[i]]$max)$summary["b", "sd"], digits = digits), ") °C / 4 yrs \n",
+      sep = "")
+  
+  cat("4 yrs increase trend in avg temp.: (", 
+      format(summary(l.veneto[[i]]$avg)$summary["b", "mean"], digits = digits), 
+      " ± ", 
+      format(summary(l.veneto[[i]]$avg)$summary["b", "sd"], digits = digits), ") °C / 4 yrs \n", 
+      sep = "")
+  
+  cat("\n")
+}
+
+for (i in 1:length(piemonte.names)) {
+  cat("######### ", piemonte.names[i], ", FIT RESULT #########\n") 
+  
+  cat("4 yrs increase trend in min temp.: (", 
+      format(summary(l.piemonte[[i]]$min)$summary["b", "mean"], digits = digits), 
+      " ± ", 
+      format(summary(l.piemonte[[i]]$min)$summary["b", "sd"], digits = digits), ") °C / 4 yrs \n",
+      sep = "")
+  
+  cat("4 yrs increase trend in max temp.: (", 
+      format(summary(l.piemonte[[i]]$max)$summary["b", "mean"], digits = digits), 
+      " ± ", 
+      format(summary(l.piemonte[[i]]$max)$summary["b", "sd"], digits = digits), ") °C / 4 yrs \n",
+      sep = "")
+  
+  cat("4 yrs increase trend in avg temp.: (", 
+      format(summary(l.piemonte[[i]]$avg)$summary["b", "mean"], digits = digits), 
+      " ± ", 
+      format(summary(l.piemonte[[i]]$avg)$summary["b", "sd"], digits = digits), ") °C / 4 yrs \n", 
+      sep = "")
+  
+  cat("\n")
+}
+```
+
+And see how the fitted data look like
+
+```{r}
+region <- 1
+station <- 2
+
+chosen.list <- switch(region, "1" = veneto.4y, "2"=piemonte.4y)
+name <- names(chosen.list)[station]
+
+sigma.4yrs.min <- switch(region, "1" = summary(l.veneto[[station]]$min)$summary["sigma", "mean"],  "2" = summary(l.piemonte[[station]]$min)$summary["sigma", "mean"])
+sigma.4yrs.max <- switch(region, "1" = summary(l.veneto[[station]]$max)$summary["sigma", "mean"],  "2" = summary(l.piemonte[[station]]$max)$summary["sigma", "mean"])
+sigma.4yrs.avg <- switch(region, "1" = summary(l.veneto[[station]]$avg)$summary["sigma", "mean"],  "2" = summary(l.piemonte[[station]]$avg)$summary["sigma", "mean"])
+
+sd.4yrs.min <- switch(region, "1" = summary(l.veneto[[station]]$min)$summary["b", "sd"],  "2" = summary(l.piemonte[[station]]$min)$summary["b", "sd"])
+sd.4yrs.max <- switch(region, "1" = summary(l.veneto[[station]]$max)$summary["b", "sd"],  "2" = summary(l.piemonte[[station]]$max)$summary["b", "sd"])
+sd.4yrs.avg <- switch(region, "1" = summary(l.veneto[[station]]$avg)$summary["b", "sd"],  "2" = summary(l.piemonte[[station]]$avg)$summary["b", "sd"])
+
+mean.4yrs.min <- switch(region, "1" = summary(l.veneto[[station]]$min)$summary["b", "mean"],  "2" = summary(l.piemonte[[station]]$min)$summary["b", "mean"])
+mean.4yrs.max <- switch(region, "1" = summary(l.veneto[[station]]$max)$summary["b", "mean"],  "2" = summary(l.piemonte[[station]]$max)$summary["b", "mean"])
+mean.4yrs.avg <- switch(region, "1" = summary(l.veneto[[station]]$avg)$summary["b", "mean"],  "2" = summary(l.piemonte[[station]]$avg)$summary["b", "mean"])
+
+x <- 1:length(rownames(chosen.list[[station]]))
+a <- ggplot(chosen.list[[station]], aes(x = x, y = delta.4yrs.min))+
+  geom_abline(intercept = mean.4yrs.min, slope = 0, color = "blue") +
+  annotate("rect", xmin = min(x), xmax = max(x), 
+           ymin = mean.4yrs.min - sd.4yrs.min, ymax = mean.4yrs.min + sd.4yrs.min,
+           fill = "blue", alpha = 0.2) +
+  geom_errorbar(aes(ymin = delta.4yrs.min - sigma.4yrs.min,
+                    ymax = delta.4yrs.min + sigma.4yrs.min),
+                width = 0.3, color = "blue") +
+  geom_point(color = "blue", size = 2) +
+  labs(title = "Incremental min temp over 4 yrs", x = "", y = expression(Delta * "T (°C)")) +
+  theme_minimal(base_size = 10) +
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
+        axis.title = element_text(size = 9),
+        axis.text = element_text(size = 8))
+
+b <- ggplot(chosen.list[[station]], aes(x = x, y = delta.4yrs.max)) +
+  geom_abline(intercept = mean.4yrs.max, slope =0, color = "red") +
+  annotate("rect", xmin = min(x), xmax = max(x), 
+           ymin = mean.4yrs.max - sd.4yrs.max, ymax = mean.4yrs.max + sd.4yrs.max,
+           fill = "red", alpha = 0.2) +
+  geom_errorbar(aes(ymin = delta.4yrs.max - sigma.4yrs.max, ymax = delta.4yrs.max + sigma.4yrs.max), width = 0.3, color = "red") +
+  geom_point(color = "red", size = 2) +
+  labs(title = "Incremental max temp over 4 yrs", x = "", y = expression(Delta * "T (°C)")) +
+  theme_minimal(base_size = 10) +
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
+        axis.title = element_text(size = 9),
+        axis.text = element_text(size = 8))
+
+c <- ggplot(chosen.list[[station]], aes(x = x, y = delta.4yrs.avg)) +
+  geom_abline(intercept = mean.4yrs.avg, slope = 0, color = "darkgreen") +
+  annotate("rect", xmin = min(x), xmax = max(x), ymin = mean.4yrs.avg - sd.4yrs.avg, ymax = mean.4yrs.avg + sd.4yrs.avg, fill = "darkgreen", alpha = 0.2) +
+  geom_errorbar(aes(ymin = delta.4yrs.avg - sigma.4yrs.avg, ymax = delta.4yrs.avg + sigma.4yrs.avg), width = 0.3, color = "darkgreen") +
+  geom_point(color = "darkgreen", size = 2) +
+  labs(title = "Incremental avg temp over 4 yrs", x = "4 yrs time interval", y = expression(Delta * "T (°C)")) +
+  theme_minimal(base_size = 10) +
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
+        axis.title = element_text(size = 9),
+        axis.text = element_text(size = 8))
+
+text <- textGrob(name, gp = gpar(fontsize = 11, fontface = "italic"))
+grid.arrange(text,arrangeGrob(a, b, c, nrow = 3), nrow = 2, heights = c(0.05, 1))
+
+```
+
+What does SNPA say? *La stima aggiornata del rateo di variazione della temperatura media dal 1981 al 2019 è di* $0,38 ± 0,05 \>^\circ C/10$ *anni; il rateo di variazione della temperatura massima (*$0,42 \pm 0,06 ^\circ C$/10 *anni) è maggiore di quello della temperatura minima (*$0.34 \pm 0.04 ^\circ /10$ *anni).* Let us compare visually the predictions
+
+Since the SNPA reports provides predictions on a 10 year time interval, we have to rescale our result
+
+```{r}
+region = 1
+
+l <- switch(region, "1" = l.veneto, "2" = l.piemonte)
+names <- switch (region, "1" = veneto.names, "2" = piemonte.names)
+temp_labels <- c("Min Temp", "Max Temp", "Avg Temp")
+colors <- c("#3178B5", "#1b9e77", "#d95f02", "#7570b3", "#e7298a")
+
+# data from SNPA
+snpa.data.mean <-  c(0.34, 0.42, 0.38) * 4/10
+snpa.data.sd <- c(0.04, 0.06, 0.05) * 4/10
+
+station.names <- c(names, "SNPA national")
+
+df <- data.frame()
+for (i in 1:length(station.names)) {
+  # k is related to min, max, avg temp
+  for (k in 1:3) {
+    # 1 to n-1 are the stations, sequentially add to the df
+    if(i == length(station.names)){
+      df <- rbind(df, data.frame(
+        station = station.names[i],
+        temperature = temp_labels[k],
+        mean_b = snpa.data.mean[k],
+        sd_b = snpa.data.sd[k],
+        quant2.5 = NA,
+        quant97.5 = NA
+      ))
+    } else {
+      smry <- summary(l[[i]][[k]])$summary
+      df <- rbind(df, data.frame(
+        station = station.names[i],
+        temperature = temp_labels[k],
+        mean_b = smry["b", "mean"],
+        sd_b = smry["b", "sd"],
+        quant2.5 = smry["b", "2.5%"],
+        quant97.5 = smry["b", "97.5%"]
+      ))
+    }
+  }
+}
+
+
+ggplot(df, aes(x = mean_b, y = station, color = station)) +
+  geom_vline(xintercept=0, linetype="dashed", lwd = 0.3, alpha = 0.5) +
+  geom_errorbarh(aes(xmin = quant2.5, xmax = quant97.5),
+               height = 0.1, size = 0.5, alpha = 0.5, color = "black")+
+  geom_errorbarh(aes(xmin = mean_b - sd_b, xmax = mean_b + sd_b), height = 0.2, size = 0.82) +
+  geom_point(size = 1.2, color = "black") +
+  facet_wrap(~temperature, nrow = 1) +
+  scale_color_manual(values = colors) +
+  labs(x = "b", y = NULL, title = "4-year trend in temperatures") +
+  theme_minimal(base_size = 11) +
+  theme(
+    legend.position = "none",       
+    strip.text = element_text(size = 10),
+    plot.title = element_text(size = 12, hjust = 0.5, face = "bold"),
+    axis.text.y = element_text(size = 8, face = "italic"),
+    legend.title = element_blank()
+  )
+
+```
+
+We will now resume our results. We compute the posterior of the average $b$ value
+
+------------------------------------------------------------------------
+
+```{r}
+p.veneto <- list(posteriorAuronzo, posteriorCastelfranco, posteriorPortoTolle, posteriorRoverchiara)
+p.piemonte <- list(posteriorCumiana, posteriorAcqui, posteriorBarant, posteriorGaressio)
+p <- switch(region, "1" = p.veneto, "2" = p.piemonte)
+
+# initialize as 0
+regional.posterior.min <- list("Veneto" = 0, "Piemonte" = 0)
+regional.posterior.max <- list("Veneto" = 0, "Piemonte" = 0)
+regional.posterior.avg <- list("Veneto" = 0, "Piemonte" = 0)
+
+# compute recurrently yhe averages
+regions <- c("Veneto: ", "Piemonte: ")
+for (region in 1:2){
+  cat(regions[region])
+  p <- switch(region, "1" = p.veneto, "2" = p.piemonte)
+  for(k in 1:n.stations){
+    regional.posterior.min[[region]] + p[[k]]$min$b/n.stations -> regional.posterior.min[[region]]
+    regional.posterior.max[[region]] + p[[k]]$max$b/n.stations -> regional.posterior.max[[region]]
+    regional.posterior.avg[[region]] + p[[k]]$avg$b/n.stations -> regional.posterior.avg[[region]]
+  }
+  cat("\n Temp min: ", mean(regional.posterior.min[[region]]), " +/- ", sd(regional.posterior.min[[region]]), "\n")
+  cat("\n Temp max: ", mean(regional.posterior.max[[region]]), " +/- ", sd(regional.posterior.max[[region]]), "\n")
+  cat("\n Temp avg: ", mean(regional.posterior.avg[[region]]), " +/- ", sd(regional.posterior.avg[[region]]), "\n\n")
+}
+```
+
+```{r}
+#pdf("ComparisonVenetoPiemonte.pdf")
+colors <- c("black", "#3178B5", "#1b9e77")
+station.names <- c("Veneto", "Piemonte", "SNPA national")
+temp_labels <- c("Min Temp", "Max Temp", "Avg Temp")
+
+tmp <- list(list(regional.posterior.min[[1]], regional.posterior.max[[1]], regional.posterior.avg[[1]]), list(regional.posterior.min[[2]], regional.posterior.max[[2]], regional.posterior.avg[[2]]))
+
+df <- data.frame()
+for (i in 1:length(station.names)) {
+  for (k in 1:3) {
+    if(i == length(station.names)){
+      df <- rbind(df, data.frame(
+        station = station.names[i],
+        temperature = temp_labels[k],
+        mean_b = snpa.data.mean[k],
+        sd_b = snpa.data.sd[k],
+        quant2.5 = NA,
+        quant97.5 = NA
+      ))
+    } else {
+      smry <- tmp[[i]][[k]]
+      df <- rbind(df, data.frame(
+        station = station.names[i],
+        temperature = temp_labels[k],
+        mean_b = mean(smry),
+        sd_b = sd(smry),
+        quant2.5 = quantile(smry, probs=0.025),
+        quant97.5 = quantile(smry, probs=0.975)
+      ))
+    }
+  }
+}
+
+df$station <- factor(df$station, levels = rev(station.names))
+
+ggplot(df, aes(x = mean_b, y = station, color = station)) +
+  geom_vline(xintercept=0, linetype="dashed", lwd = 0.3, alpha = 0.5) +
+  geom_errorbarh(aes(xmin = quant2.5, xmax = quant97.5),
+               height = 0.1, size = 0.5, alpha = 0.5, color = "black")+
+  geom_errorbarh(aes(xmin = mean_b - sd_b, xmax = mean_b + sd_b), height = 0.2, size = 0.82) +
+  geom_point(size = 1.2, color = "black") +
+  facet_wrap(~temperature, nrow = 1) +
+  scale_color_manual(values = colors) +
+  labs(x = "b", y = NULL, title = "4-year trend in temperatures") +
+  theme_minimal(base_size = 11) +
+  theme(
+    legend.position = "none",       
+    strip.text = element_text(size = 10),
+    plot.title = element_text(size = 12, hjust = 0.5, face = "bold"),
+    axis.text.y = element_text(size = 8, face = "italic"),
+    legend.title = element_blank()
+  )
+
+#dev.off()
+```
+
+And now the posterior distribution itself
+
+```{r}
+#select the region
+region <- 2
+
+dfff <- bind_rows(
+  data.frame(b = regional.posterior.min[[region]], type = "Min"),
+  data.frame(b = regional.posterior.max[[region]], type = "Max"),
+  data.frame(b = regional.posterior.avg[[region]], type = "Avg")
+)
+
+color <- c("Min" = "blue", "Max" = "red", "Avg" = "darkgreen")
+
+ggplot(dfff, aes(x = b, color = type)) +
+  geom_density(size = 1.2) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  scale_color_manual(values = color, name = NULL) +
+  labs(title = "Posterior of average b over Piemonte's stations", x = "b", y = "PDF") +
+  coord_cartesian(xlim = c(-0.5, 0.5)) +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+## Statistical test
+
+### Compatibility between regions
+
+Since we have the samples from which we reconstructed the posterior of $b_p, b_v$, we can easily compute numerically the distribution of the random variable $b_p - b_v$ and verify whether or not $0$ lies within the rejection region
+
+```{r}
+
+df.posterior.difference <- bind_rows(
+  data.frame(b = regional.posterior.min[[1]]-regional.posterior.min[[2]], type = "Min"),
+  data.frame(b = regional.posterior.max[[1]]-regional.posterior.max[[2]], type = "Max"),
+  data.frame(b = regional.posterior.avg[[1]]-regional.posterior.avg[[2]], type = "Avg")
+)
+
+colors <- c("Min" = "blue", "Max" = "red", "Avg" = "darkgreen")
+
+ggplot(df.posterior.difference, aes(x = b, color = type)) +
+  geom_density(size = 1.2) +
+  scale_color_manual(values = colors, name = NULL) +
+  geom_vline(xintercept = quantile(as.vector(filter(df.posterior.difference, type=="Min")[,"b"]),0.025), color="blue", linetype="dashed") +
+  geom_vline(xintercept = quantile(as.vector(filter(df.posterior.difference, type=="Max")[,"b"]),0.025), color="red", linetype="dashed") +
+  geom_vline(xintercept = quantile(as.vector(filter(df.posterior.difference, type=="Avg")[,"b"]),0.025), color="darkgreen", linetype="dashed") +
+  geom_vline(xintercept = quantile(as.vector(filter(df.posterior.difference, type=="Min")[,"b"]),0.975), color="blue", linetype="dashed") +
+  geom_vline(xintercept = quantile(as.vector(filter(df.posterior.difference, type=="Max")[,"b"]),0.975), color="red", linetype="dashed") +
+  geom_vline(xintercept = quantile(as.vector(filter(df.posterior.difference, type=="Avg")[,"b"]),0.975), color="darkgreen", linetype="dashed") +
+  labs(title = expression("Posterior of " * (b[p] - b[v])), x =  expression(b[p] - b[v]), y = "PDF") +
+  coord_cartesian(xlim = c(-0.5, 0.5)) +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(hjust = 0.5))
+```
